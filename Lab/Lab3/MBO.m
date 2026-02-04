@@ -1,9 +1,9 @@
 % TTK4135 - Helicopter lab
 % Hints/template for problem 2.
-% Updated spring 2018, Andreas L. FlÃ¥ten
+% Updated spring 2018, Andreas L. Flåten
 
 %% Initialization and model definition
-init06; % Change this to the init file corresponding to your helicopter
+init07; % Change this to the init file corresponding to your helicopter
 
 % Discrete time system model. x = [lambda r p p_dot]'
 delta_t	= 0.25; % sampling time
@@ -37,9 +37,11 @@ xl(3)   = ul;                           % Lower bound on state x3
 xu(3)   = uu;                           % Upper bound on state x3
 
 % Generate constraints on measurements and inputs
-[vlb,vub]       = gen_constraint(N, M, xl, xu, ul, uu); % hint: gen_constraints
+[vlb,vub]       = gen_constraints(N, M, xl, xu, ul, uu); % hint: gen_constraints
 vlb(N*mx+M*mu)  = 0;                    % We want the last input to be zero
 vub(N*mx+M*mu)  = 0;                    % We want the last input to be zero
+
+fin_pos = 0;
 
 % Generate the matrix Q and the vector c (objecitve function weights in the QP problem) 
 Q1 = zeros(mx,mx);
@@ -47,18 +49,18 @@ Q1(1,1) = 1;                            % Weight on state x1
 Q1(2,2) = 1;                            % Weight on state x2
 Q1(3,3) = 1;                            % Weight on state x3
 Q1(4,4) = 1;                            % Weight on state x4
-P1 = 0;                                 % Weight on input
+P1 = 1;                                 % Weight on input
 Q = gen_q(Q1, P1, N, M);                % Generate Q, hint: gen_q
-c = zeroes(N*mx + M*mu,1);              % Generate c, this is the linear constant term in the QP
+c = -2 * fin_pos * ones(N*mx + M*mu,1);              % Generate c, this is the linear constant term in the QP
 
 %% Generate system matrixes for linear model
-Aeq = gen_aeq(A, B, N, mx, mu);             % Generate A, hint: gen_aeq
-beq = zeroes(N*mx, 1);             % Generate b
-beq(1:mx) = A*x0;
+Aeq = gen_aeq(A1, B1, N, mx, mu);             % Generate A, hint: gen_aeq
+beq = zeros(N*mx, 1);             % Generate b
+beq(1:mx) = A1*x0;
 
 %% Solve QP problem with linear model
 tic
-[z,lambda] = ; % hint: quadprog. Type 'doc quadprog' for more info 
+[z,lambda] = quadprog(Q, c, [], [], Aeq, beq, vlb, vub, x0); % hint: quadprog. Type 'doc quadprog' for more info 
 t1=toc;
 
 % Calculate objective value
@@ -77,7 +79,7 @@ x2 = [x0(2);z(2:mx:N*mx)];              % State x2 from solution
 x3 = [x0(3);z(3:mx:N*mx)];              % State x3 from solution
 x4 = [x0(4);z(4:mx:N*mx)];              % State x4 from solution
 
-num_variables = 5/delta_t;
+num_variables = 10/delta_t;
 zero_padding = zeros(num_variables,1);
 unit_padding  = ones(num_variables,1);
 
@@ -87,9 +89,14 @@ x2  = [zero_padding; x2; zero_padding];
 x3  = [zero_padding; x3; zero_padding];
 x4  = [zero_padding; x4; zero_padding];
 
-%% Plotting
+%% Output formatting
 t = 0:delta_t:delta_t*(length(u)-1);
 
+u_opt = [t', u];
+x_opt = [t', x1, x2, x3, x4];
+
+%% Plotting
+% 
 figure(2)
 subplot(511)
 stairs(t,u),grid

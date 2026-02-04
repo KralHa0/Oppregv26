@@ -3,7 +3,7 @@
 % Updated spring 2018, Andreas L. Flåten
 
 %% Initialization and model definition
-init06; % Change this to the init file corresponding to your helicopter
+init07; % Change this to the init file corresponding to your helicopter
 
 % Discrete time system model. x = [lambda r p p_dot]'
 delta_t	= 0.25; % sampling time
@@ -89,6 +89,8 @@ x4  = [zero_padding; x4; zero_padding];
 
 %% Plotting
 t = 0:delta_t:delta_t*(length(u)-1);
+
+simInput = [t', u];
 
 figure(2)
 subplot(511)
