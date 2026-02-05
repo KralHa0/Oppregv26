@@ -23,6 +23,8 @@ lambdat = 2*pi / 3;
 q1 = 1; 
 q2 = 1;
 
+P1 = diag([q1 q2]);
+
 % Number of states and inputs
 mx = size(A2,2); % Number of states (number of columns in A)
 mu = size(B2,2); % Number of inputs(number of columns in B)
@@ -57,21 +59,90 @@ vlb(N*mx+M*mu)  = 0;                    % We want the last input to be zero
 vub(N*mx+M*mu)  = 0;                    % We want the last input to be zero
 
 % Generate the matrix Q and the vector c (objecitve function weights in the QP problem) 
-Q1 = zeros(mx,mx);
-Q1(1,1) = 1;                            % Weight on state x1
-Q1(2,2) = 1;                            % Weight on state x2
-Q1(3,3) = 1;                            % Weight on state x3
-Q1(4,4) = 1;                            % Weight on state x4
-Q = gen_q(Q1, P1, N, M);                % Generate Q, hint: gen_q
+Q2 = zeros(mx,mx);
+Q2(1,1) = 1;                            % Weight on state x1
+Q2(2,2) = 0;                            % Weight on state x2
+Q2(3,3) = 0;                            % Weight on state x3
+Q2(4,4) = 0;                            % Weight on state x4
+Q2(5,5) = 0;                            % Weight on state x5
+Q2(6,6) = 0;                            % Weight on state x6
+Q = gen_q(Q2, P1, N, M);                % Generate Q, hint: gen_q
 
 % Generate c
-%c2mult = alpha * exp(-beta*())
-c2 = c2mult * ones(N*mx + M*mu,1);
-%%for 
-
+c = zeros(N* mx + M*mu, 1);
 
 %% Generate system matrixes for linear model
 Aeq2 = gen_aeq(A2, B2, N, mx, mu);     % Generate A, hint: gen_aeq
 beq2 = zeros(N*mx, 1);                 % Generate b
 beq2(1:mx) = A2*x0;
 
+%% fmincon setting
+nonlcon = @(z) elevation_constraints(z, N, mx, alpha, beta, lambdat);
+objective_func = @(z) z' * Q * z;
+options = optimoptions('fmincon', 'Display', 'iter', 'Algorithm', 'sqp', 'MaxIterations', 1000);
+tic
+[z_opt, fval] = fmincon(objective_func, z0, [], [], Aeq2, beq2, vlb, vub, nonlcon, options);
+t_opt = toc;
+
+
+fprintf('Optimization completed in %.2f seconds\n', t_opt);
+fprintf('Objective value: %.4f\n', fval);
+
+%% Extract solution
+u = [z_opt(N*mx+1:N*mx+M*mu); z_opt(N*mx+M*mu)];
+
+x1 = [x0(1); z_opt(1:mx:N*mx)];    % Lambda
+x2 = [x0(2); z_opt(2:mx:N*mx)];    % r
+x3 = [x0(3); z_opt(3:mx:N*mx)];    % p
+x4 = [x0(4); z_opt(4:mx:N*mx)];    % p_dot
+x5 = [x0(5); z_opt(5:mx:N*mx)];    % e
+x6 = [x0(6); z_opt(6:mx:N*mx)];    % e_dot
+
+% Time vector
+t = 0:delta_t:delta_t*(length(x1)-1);
+
+%% Plot results
+figure(1)
+subplot(3,2,1)
+plot(t, x1)
+grid on
+ylabel('Lambda [rad]')
+title('Travel')
+
+subplot(3,2,2)
+plot(t, x2)
+grid on
+ylabel('r [rad/s]')
+title('Travel rate')
+
+subplot(3,2,3)
+plot(t, x3)
+grid on
+ylabel('p [rad]')
+title('Pitch')
+
+subplot(3,2,4)
+plot(t, x4)
+grid on
+ylabel('p dot [rad/s]')
+title('Pitch rate')
+
+subplot(3,2,5)
+plot(t, x5)
+hold on
+% Plot the elevation constraint
+lambda_plot = linspace(0, pi, 100);
+e_constraint = alpha * exp(-beta * (lambda_plot - lambdat).^2);
+plot(lambda_plot, e_constraint, 'r--', 'LineWidth', 2)
+grid on
+ylabel('e [rad]')
+xlabel('Time [s]')
+title('Elevation')
+legend('Elevation', 'Constraint')
+
+subplot(3,2,6)
+plot(t, x6)
+grid on
+ylabel('e dot [rad/s]')
+xlabel('Time [s]')
+title('Elevation rate')
